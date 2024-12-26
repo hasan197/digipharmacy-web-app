@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+    volumes:
+      - .:/var/www
+      - /var/www/html/node_modules
+    ports:
+      - "8000:8000"
+      - "5173:5173"
+    working_dir: /var/www
+    environment:
+    #   - APP_ENV=local
+      - VITE_APP_PORT=5173
+    depends_on:
+      - db
+    command: >
+      bash -c "
+        if [ \"$$APP_ENV\" = \"production\" ]; then
+          rm -rf public/build &&
+          npm run build &&
+          php artisan serve --host=0.0.0.0 --port=8000;
+        else
+          php artisan serve --host=0.0.0.0 --port=8000;
+        fi
+      "
+
+  db:
+    image: mysql:5.7
+    restart: always
+    environment:
+      MYSQL_DATABASE: digipharmacy
+      MYSQL_USER: digipharmacy_user
+      MYSQL_PASSWORD: digipharmacy_password
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:
