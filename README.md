@@ -10,7 +10,7 @@ The DigiPharmacy Web App is an example platform designed using Docker, Laravel, 
 - Node.js 18+
 - MySQL 5.7
 - Composer
-- nerdctl
+- nerdctl atau docker
 
 ## Development Setup
 
