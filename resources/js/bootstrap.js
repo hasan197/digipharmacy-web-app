@@ -7,7 +7,31 @@
 import axios from 'axios';
 window.axios = axios;
 
+// Set JWT token from localStorage if exists
+const auth = localStorage.getItem('auth');
+console.log('Auth from localStorage:', auth); // Log auth data
+if (auth) {
+    const { access_token } = JSON.parse(auth);
+    console.log('Setting token:', access_token); // Log token
+    window.axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+}
+
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+
+// Add response interceptor for handling 401 errors
+window.axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            console.log('Unauthorized, redirecting to login...');
+            // Clear auth data
+            localStorage.removeItem('auth');
+            // Redirect to login
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
+    }
+);
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening

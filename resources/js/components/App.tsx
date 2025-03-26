@@ -3,14 +3,17 @@
  * Handles routing, authentication, and layout management
  */
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './auth/Login';
 import POS from './pos/POS';
 import DefaultLayout from './layouts/DefaultLayout';
 import Dashboard from './dashboard/Dashboard';
 import Prescriptions from './prescriptions/Prescriptions';
 import Customers from './customers/Customers';
-import Inventory from './inventory/Inventory';
+import SalesList from './pos/SalesList';
+import Roles from './roles/Roles';
+import AdminRoute from './auth/AdminRoute';
+import ProductInventoryIntegration from './product/ProductInventoryIntegration';
 import { auth } from '@/lib/auth';
 
 /**
@@ -148,7 +151,7 @@ const App: React.FC = () => {
                         </ProtectedRoute>
                     } />
                     
-                    <Route path="/pos/*" element={
+                    <Route path="/pos" element={
                         <ProtectedRoute>
                             <POS />
                         </ProtectedRoute>
@@ -166,9 +169,23 @@ const App: React.FC = () => {
                         </ProtectedRoute>
                     } />
 
-                    <Route path="/inventory" element={
+                    {/* Inventory route removed - now using integrated ProductInventoryIntegration */}
+                    <Route path="/products" element={
                         <ProtectedRoute>
-                            <Inventory />
+                            <ProductInventoryIntegration />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/roles" element={
+                        <ProtectedRoute>
+                            <AdminRoute>
+                                <Roles />
+                            </AdminRoute>
+                        </ProtectedRoute>
+                    } />
+
+                    <Route path="/sales" element={
+                        <ProtectedRoute>
+                            <SalesList />
                         </ProtectedRoute>
                     } />
 

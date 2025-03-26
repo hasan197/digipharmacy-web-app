@@ -1,80 +1,97 @@
-const SkeletonCard = () => {
-    return (
-        <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-100 overflow-hidden hover:shadow-xl transition-all w-full animate-pulse">
-            <div className="h-48 bg-gray-200"></div>
-            
-            <div className="p-6">
-                <div className="mb-4">
-                    <div className="h-6 bg-gray-200 rounded-lg w-3/4 mb-2"></div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                    <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-                    <div className="h-10 bg-gray-200 rounded-xl w-1/3"></div>
-                </div>
-            </div>
-        </div>
-    );
-};
+import React from 'react';
 
 interface InventoryCardProps {
-    name: string;
-    image: string;
-    category: string;
-    price: number;
-    stock: number;
-    onAddToCart: () => void;
-    isLoading?: boolean;
-}
-
-export default function InventoryCard({ isLoading = false, ...props }: InventoryCardProps) {
-    if (isLoading) {
-        return <SkeletonCard />;
-    }
-
+    name: string
+    category: string
+    price: string
+    stock: number
+    requires_prescription?: boolean
+    onAddToCart: () => void
+    isLoading?: boolean
+  }
+  
+  function SkeletonCard() {
     return (
-        <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-100 overflow-hidden hover:shadow-xl transition-all w-full">
-            <div className="relative">
-                <img
-                    src={props.image}
-                    alt={props.name}
-                    className="w-full h-48 object-cover"
-                />
-                <span className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-medium rounded-full">
-                    {props.category}
-                </span>
-            </div>
-            
-            <div className="p-6">
-                <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{props.name}</h3>
-                    <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                        <span className="text-sm text-gray-600">{props.stock} in stock</span>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Rp {props.price.toLocaleString()}
-                    </span>
-                    <button
-                        onClick={props.onAddToCart}
-                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all"
-                    >
-                        Add to Cart
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
+      <div className="w-full rounded-xl border border-gray-100 bg-white p-4 shadow-sm animate-pulse">
+        <div className="space-y-3">
+          <div className="h-5 w-1/3 rounded bg-gray-100" />
+          <div className="h-6 w-3/4 rounded-lg bg-gray-100" />
+          <div className="h-6 w-1/2 rounded bg-gray-100" />
+          <div className="flex items-center justify-between pt-2">
+            <div className="h-8 w-1/3 rounded bg-gray-100" />
+            <div className="h-9 w-1/3 rounded-lg bg-gray-100" />
+          </div>
         </div>
-    );
-}
+      </div>
+    )
+  }
+  
+  export default function InventoryCard({ isLoading = false, ...props }: InventoryCardProps) {
+    if (isLoading) {
+      return <SkeletonCard />
+    }
+  
+    return (
+      <div className="group relative w-full overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-purple-50/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+  
+        {/* Card Content */}
+        <div className="relative p-4">
+          <div className="space-y-4">
+            {/* Category Badge */}
+            <div>
+              <span className="inline-block rounded-md bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 shadow-sm transition-shadow duration-300 group-hover:shadow-purple-100/50">
+                {props.category}
+              </span>
+            </div>
+  
+            {/* Medicine Name */}
+            <div className="flex items-center gap-2">
+              <h3 className="line-clamp-2 text-base font-semibold text-gray-900">{props.name}</h3>
+              {props.requires_prescription && (
+                <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                  Rx
+                </span>
+              )}
+            </div>
+  
+            {/* Stock Info */}
+            <div className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${props.stock > 10 ? "bg-green-400" : "bg-orange-400"}`} />
+              <span className="text-sm text-gray-600">
+                {props.stock} {props.stock === 1 ? "unit" : "units"} tersedia
+              </span>
+            </div>
+  
+            {/* Price Section */}
+            <div className="flex items-baseline justify-between border-t border-gray-100 pt-3">
+              <span className="text-xs text-gray-500">Harga</span>
+              <span className="text-lg font-bold text-gray-900">{props.price}</span>
+            </div>
+          </div>
+  
+          {/* Add to Cart Button */}
+          <div className="mt-4">
+            <button
+              onClick={props.onAddToCart}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-purple-700 hover:shadow-md hover:shadow-purple-200/50 active:bg-purple-800 group-hover:scale-[1.02]"
+            >
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add to Cart
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }

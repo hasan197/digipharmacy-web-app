@@ -2,10 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\MedicineController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\SalesController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
@@ -23,6 +24,11 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 // API routes for authentication
 Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.api');
 Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
+
+// Protected routes that require authentication
+Route::middleware('auth:api')->group(function () {
+    Route::get('/api/sales', [SalesController::class, 'index']);
+});
 
 // React routes - This should be the last route
 Route::get('/{any}', function () {

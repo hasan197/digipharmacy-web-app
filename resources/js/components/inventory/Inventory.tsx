@@ -1,3 +1,5 @@
+import React, { useState, useEffect } from "react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
@@ -8,6 +10,15 @@ import {
     TableHeader,
     TableRow 
 } from "@/components/ui/table"
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination"
 import { 
     Card,
     CardContent,
@@ -21,43 +32,77 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useState } from "react"
-import DefaultLayout from "../layouts/DefaultLayout"
 
-interface InventoryItem {
-    id: number
-    name: string
-    category: string
-    stock: number
-    unit: string
-    supplier: string
-    expiryDate: string
-    price: number
-}
+import { inventoryService, type InventoryItem } from '@/services/inventory.service';
 
 export default function Inventory() {
-    const [inventory, setInventory] = useState<InventoryItem[]>([
-        {
-            id: 1,
-            name: "Paracetamol 500mg",
-            category: "Obat Bebas",
-            stock: 500,
-            unit: "Strip",
-            supplier: "PT Kimia Farma",
-            expiryDate: "2025-12-31",
-            price: 12000
-        },
-        {
-            id: 2,
-            name: "Amoxicillin 500mg",
-            category: "Obat Keras",
-            stock: 200,
-            unit: "Strip",
-            supplier: "PT Kalbe Farma",
-            expiryDate: "2025-06-30",
-            price: 25000
+    const [inventory, setInventory] = useState<InventoryItem[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [itemsPerPage] = useState(10);
+    const [allInventoryItems, setAllInventoryItems] = useState<InventoryItem[]>([]);
+
+    useEffect(() => {
+        fetchInventory();
+    }, [currentPage]);
+
+    const fetchInventory = async () => {
+        setLoading(true);
+        try {
+            const inventoryData = await inventoryService.getInventory({
+                query: searchQuery,
+                category: selectedCategory
+            });
+            
+            // Ensure we're working with an array
+            if (Array.isArray(inventoryData)) {
+                setAllInventoryItems(inventoryData);
+                
+                // Calculate pagination
+                const totalItems = inventoryData.length;
+                setTotalPages(Math.ceil(totalItems / itemsPerPage));
+                
+                // Get current page items
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedItems = inventoryData.slice(startIndex, endIndex);
+                setInventory(paginatedItems);
+            } else {
+                // Fallback to empty array if response is not as expected
+                console.error('Unexpected API response format:', inventoryData);
+                setInventory([]);
+                setAllInventoryItems([]);
+                setTotalPages(1);
+            }
+            
+            setError(null);
+        } catch (err) {
+            setError('Failed to fetch inventory');
+            console.error('Error fetching inventory:', err);
+            setInventory([]); // Ensure inventory is an array even on error
+            setAllInventoryItems([]);
+            setTotalPages(1);
+        } finally {
+            setLoading(false);
         }
-    ])
+    };
+
+    const handleSearch = () => {
+        setCurrentPage(1); // Reset to first page when searching
+        fetchInventory();
+    };
+
+    const handleCategoryFilter = (category: string) => {
+        setSelectedCategory(category);
+        setCurrentPage(1); // Reset to first page when filtering
+        fetchInventory();
+    };
 
     return (
         <div className="container mx-auto p-6">
@@ -79,9 +124,15 @@ export default function Inventory() {
                             <Input 
                                 placeholder="Cari nama obat..." 
                                 className="flex-1"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                             />
-                            <Button variant="secondary">
-                                Cari
+                            <Button 
+                                variant="secondary"
+                                onClick={handleSearch}
+                                disabled={loading}
+                            >
+                                {loading ? 'Mencari...' : 'Cari'}
                             </Button>
                         </div>
                     </CardContent>
@@ -94,7 +145,7 @@ export default function Inventory() {
                     </CardHeader>
                     <CardContent>
                         <div className="flex gap-4">
-                            <Select>
+                            <Select value={selectedCategory} onValueChange={handleCategoryFilter}>
                                 <SelectTrigger className="flex-1">
                                     <SelectValue placeholder="Pilih Kategori" />
                                 </SelectTrigger>
@@ -139,7 +190,7 @@ export default function Inventory() {
                     <CardContent>
                         <p className="text-3xl font-bold text-red-600">
                             {inventory.filter(item => {
-                                const expiryDate = new Date(item.expiryDate);
+                                const expiryDate = new Date(item.expiry_date || '');
                                 const threeMonthsFromNow = new Date();
                                 threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
                                 return expiryDate <= threeMonthsFromNow;
@@ -174,14 +225,14 @@ export default function Inventory() {
                                 <TableRow key={item.id}>
                                     <TableCell>{item.id}</TableCell>
                                     <TableCell>{item.name}</TableCell>
-                                    <TableCell>{item.category}</TableCell>
+                                    <TableCell>{item.category_id}</TableCell>
                                     <TableCell className={item.stock < 100 ? "text-yellow-600 font-medium" : ""}>
                                         {item.stock}
                                     </TableCell>
                                     <TableCell>{item.unit}</TableCell>
-                                    <TableCell>{item.supplier}</TableCell>
-                                    <TableCell>{item.expiryDate}</TableCell>
-                                    <TableCell>Rp {item.price.toLocaleString()}</TableCell>
+                                    <TableCell>-</TableCell>
+                                    <TableCell>{item.expiry_date}</TableCell>
+                                    <TableCell>Rp {item.price ? item.price.toLocaleString() : '0'}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button variant="outline" size="sm">
@@ -199,6 +250,82 @@ export default function Inventory() {
                             ))}
                         </TableBody>
                     </Table>
+                    
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="mt-4 flex justify-center">
+                            <Pagination>
+                                <PaginationContent>
+                                    <PaginationItem>
+                                        <PaginationPrevious 
+                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                                            disabled={currentPage === 1}
+                                        />
+                                    </PaginationItem>
+                                    
+                                    {/* First page */}
+                                    {currentPage > 2 && (
+                                        <PaginationItem>
+                                            <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
+                                        </PaginationItem>
+                                    )}
+                                    
+                                    {/* Ellipsis if needed */}
+                                    {currentPage > 3 && (
+                                        <PaginationItem>
+                                            <PaginationEllipsis />
+                                        </PaginationItem>
+                                    )}
+                                    
+                                    {/* Previous page if not first */}
+                                    {currentPage > 1 && (
+                                        <PaginationItem>
+                                            <PaginationLink onClick={() => setCurrentPage(currentPage - 1)}>
+                                                {currentPage - 1}
+                                            </PaginationLink>
+                                        </PaginationItem>
+                                    )}
+                                    
+                                    {/* Current page */}
+                                    <PaginationItem>
+                                        <PaginationLink isActive>{currentPage}</PaginationLink>
+                                    </PaginationItem>
+                                    
+                                    {/* Next page if not last */}
+                                    {currentPage < totalPages && (
+                                        <PaginationItem>
+                                            <PaginationLink onClick={() => setCurrentPage(currentPage + 1)}>
+                                                {currentPage + 1}
+                                            </PaginationLink>
+                                        </PaginationItem>
+                                    )}
+                                    
+                                    {/* Ellipsis if needed */}
+                                    {currentPage < totalPages - 2 && (
+                                        <PaginationItem>
+                                            <PaginationEllipsis />
+                                        </PaginationItem>
+                                    )}
+                                    
+                                    {/* Last page */}
+                                    {currentPage < totalPages - 1 && (
+                                        <PaginationItem>
+                                            <PaginationLink onClick={() => setCurrentPage(totalPages)}>
+                                                {totalPages}
+                                            </PaginationLink>
+                                        </PaginationItem>
+                                    )}
+                                    
+                                    <PaginationItem>
+                                        <PaginationNext 
+                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                                            disabled={currentPage === totalPages}
+                                        />
+                                    </PaginationItem>
+                                </PaginationContent>
+                            </Pagination>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>

@@ -12,7 +12,17 @@ RUN apt-get update && apt-get install -y \
     lsof \
     net-tools \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd zip pdo pdo_mysql
+    && docker-php-ext-install gd zip pdo pdo_mysql bcmath opcache
+
+# Install additional PHP extensions
+RUN pecl install redis \
+    && docker-php-ext-enable redis
+
+# Configure PHP
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+    && echo "memory_limit = 512M" >> "$PHP_INI_DIR/php.ini" \
+    && echo "upload_max_filesize = 64M" >> "$PHP_INI_DIR/php.ini" \
+    && echo "post_max_size = 64M" >> "$PHP_INI_DIR/php.ini"
 
 # Install Node.js and npm
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
@@ -37,6 +47,9 @@ RUN composer install --no-interaction --no-plugins
 
 # Install Node.js dependencies
 RUN npm install
+
+# Generate JWT secret if not exists
+RUN php artisan jwt:secret --force
 
 # Expose ports
 EXPOSE 8000 5173

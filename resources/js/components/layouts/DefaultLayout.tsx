@@ -3,6 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth } from '@/lib/auth';
 import { LoadingBar } from '@/components/ui/loading-bar';
 
+const hasRole = (roleName: string): boolean => {
+    const user = auth.getUser();
+    return user?.roles?.some(role => role.name === roleName) || false;
+};
+
 interface DefaultLayoutProps {
     children: React.ReactNode;
 }
@@ -53,7 +58,7 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                     {/* Toggle Button */}
                     <button 
                         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                        className="absolute -right-3 top-16 bg-white border border-gray-200 rounded-full w-6 h-6 flex items-center justify-center cursor-pointer z-50 hover:bg-gray-50"
+                        className="absolute -right-3 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 rounded-full w-6 h-6 flex items-center justify-center cursor-pointer z-50 hover:bg-gray-50"
                     >
                         <svg 
                             className={`w-4 h-4 text-gray-600 transform transition-transform duration-300 ${
@@ -70,7 +75,7 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                     {/* Sidebar Content */}
                     <div className="flex-1 flex flex-col">
                         {/* Logo Section */}
-                        <div className={`p-4 ${isSidebarCollapsed ? 'p-2' : ''}`}>
+                        <div className={`${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
                             <div className="flex items-center gap-3">
                                 {/* App Logo */}
                                 <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
@@ -99,7 +104,7 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                                 } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
                             >
                                 <svg className={`w-5 h-5 ${!isSidebarCollapsed && 'mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h7v7H3V3zM14 3h7v7h-7V3zM3 14h7v7H3v-7zM14 14h7v7h-7v-7z" />
                                 </svg>
                                 {!isSidebarCollapsed && <span>Dashboard</span>}
                             </Link>
@@ -147,9 +152,9 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                             </Link>
 
                             <Link 
-                                to="/inventory"
+                                to="/products"
                                 className={`flex items-center px-4 py-2 transition-colors ${
-                                    isActivePath('/inventory')
+                                    isActivePath('/products')
                                         ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
                                         : 'text-gray-700 hover:bg-gray-50'
                                 } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
@@ -158,7 +163,23 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                 </svg>
                                 {!isSidebarCollapsed && <span>Stok Obat</span>}
-                            </Link>                        
+                            </Link>
+
+                            {hasRole('admin') && (
+                                <Link 
+                                    to="/roles"
+                                    className={`flex items-center px-4 py-2 transition-colors ${
+                                        isActivePath('/roles')
+                                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
+                                            : 'text-gray-700 hover:bg-gray-50'
+                                    } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
+                                >
+                                    <svg className={`w-5 h-5 ${!isSidebarCollapsed && 'mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                    </svg>
+                                    {!isSidebarCollapsed && <span>Manajemen Role</span>}
+                                </Link>
+                            )}                        
                         </nav>
 
                         {/* Logout Button */}

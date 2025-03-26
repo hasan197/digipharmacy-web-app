@@ -12,19 +12,23 @@ class UserSeeder extends Seeder
     {
         // Create admin user
         User::create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
+            'name' => 'Admin',
+            'email' => 'admin@digipharmacy.com',
             'password' => Hash::make('password123'),
         ]);
 
-        // Create staff user
+        // Create pharmacist user
         User::create([
-            'name' => 'Staff User',
-            'email' => 'staff@example.com',
+            'name' => 'Pharmacist',
+            'email' => 'pharmacist@digipharmacy.com',
             'password' => Hash::make('password123'),
         ]);
 
-        // Create additional sample users
-        User::factory(3)->create();
+        // Create cashier user
+        User::create([
+            'name' => 'Cashier',
+            'email' => 'cashier@digipharmacy.com',
+            'password' => Hash::make('password123'),
+        ]);
     }
 }

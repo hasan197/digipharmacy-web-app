@@ -1,80 +1,186 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import axios from 'axios';
-import SaleCard from './SaleCard';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { posService, type Product, type CartItem } from '@/services/pos.service';
 import InventoryCard from './InventoryCard';
+import InventoryTable from './InventoryTable';
 import Cart from './Cart';
+import SalesList from './SalesList';
 import debounce from 'lodash/debounce';
-
-interface Medicine {
-    id: number;
-    name: string;
-    price: number;
-    stock: number;
-    unit: string;
-    category: {
-        id: number;
-        name: string;
-    };
-}
-
-interface CartItem {
-    id: string;
-    name: string;
-    price: number;
-    stock: number;
-    quantity?: number;
-}
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatPrice } from '../ui/utils';
+import { PaymentData } from './PaymentMethodForm';
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function POS() {
-    const [selectedTab, setSelectedTab] = useState('all');
-    const [cartItems, setCartItems] = useState<CartItem[]>([]);
-    const [medicines, setMedicines] = useState<Medicine[]>([]);
+    const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+        const savedCart = localStorage.getItem('cart');
+        return savedCart ? JSON.parse(savedCart) : [];
+    });
+    const [products, setProducts] = useState<Product[]>([]);
+    const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
-    const [inventory, setInventory] = useState([]);
+    const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [processingCheckout, setProcessingCheckout] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState(() => {
+        return localStorage.getItem('paymentMethod') || '';
+    });
+    const [viewMode, setViewMode] = useState(() => {
+        return localStorage.getItem('posViewMode') || 'grid';
+    });
     
-    // Tambahkan debounce untuk mencegah terlalu banyak request
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [itemsPerPage] = useState(12); // Show more items per page for POS
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    
+    const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
+
+    const [pendingSales, setPendingSales] = useState(() => {
+        const saved = localStorage.getItem('pendingSales');
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(() => {
+        const savedCustomerId = localStorage.getItem('selectedCustomerId');
+        return savedCustomerId ? JSON.parse(savedCustomerId) : null;
+    });
+    const [customerName, setCustomerName] = useState(() => {
+        return localStorage.getItem('customerName') || '';
+    });
+    const [customerPhone, setCustomerPhone] = useState(() => {
+        return localStorage.getItem('customerPhone') || '';
+    });
+
+    // Debounced search function
     const debouncedSearch = useCallback(
         debounce(async (query: string) => {
             try {
-                const response = await axios.get('/api/medicines/search', {
-                    params: { query }
-                });
-                setMedicines(response.data);
+                const data = await posService.searchProducts(query);
+                setAllProducts(data);
+                
+                // Calculate pagination
+                const totalItems = data.length;
+                setTotalPages(Math.ceil(totalItems / itemsPerPage));
+                
+                // Get current page items
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedProducts = data.slice(startIndex, endIndex);
+                setProducts(paginatedProducts);
+                
+                // Update low stock products when searching
+                const lowStock = data.filter(product => product.stock < 10);
+                setLowStockProducts(lowStock);
             } catch (error) {
-                console.error('Error searching medicines:', error);
+                console.error('Error searching products:', error);
+                setProducts([]);
+                setAllProducts([]);
+                setTotalPages(1);
             } finally {
                 setIsLoading(false);
             }
         }, 300),
-        []
+        [currentPage]
     );
 
-    // Update useEffect untuk memanggil API search ketika query berubah
+    const requestSent = useRef(false);
+
+    // Update useEffect untuk memanggil API search ketika query berubah atau halaman berubah
     useEffect(() => {
         if (searchQuery.trim() === '') {
-            // Jika search kosong, tampilkan semua medicines
-            const fetchMedicines = async () => {
-                setIsLoading(true);
-                try {
-                    const response = await axios.get('/api/medicines');
-                    setMedicines(response.data);
-                } catch (error) {
-                    console.error('Error fetching medicines:', error);
-                } finally {
-                    setIsLoading(false);
+            if (!requestSent.current) {
+                const auth = localStorage.getItem('auth');
+                if (!auth) {
+                    console.log('User not logged in, redirecting to login...');
+                    window.location.href = '/login';
+                    return;
                 }
-            };
-            fetchMedicines();
+                console.log('Fetching products data...');
+                fetchProducts();
+                requestSent.current = true;
+            } else if (requestSent.current) {
+                // Update pagination when changing page
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedProducts = allProducts.slice(startIndex, endIndex);
+                setProducts(paginatedProducts);
+            }
         } else {
             setIsLoading(true);
             debouncedSearch(searchQuery);
         }
-    }, [searchQuery]);
+    }, [searchQuery, currentPage]);
 
-    // Handler untuk input search
+    const fetchProducts = async () => {
+        setIsLoading(true);
+        try {
+            const data = await posService.getProducts();
+            setAllProducts(data);
+            
+            // Calculate pagination
+            const totalItems = data.length;
+            setTotalPages(Math.ceil(totalItems / itemsPerPage));
+            
+            // Get current page items
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedProducts = data.slice(startIndex, endIndex);
+            setProducts(paginatedProducts);
+            
+            // Filter products with low stock (less than 10 items)
+            const lowStock = data.filter(product => product.stock < 10);
+            setLowStockProducts(lowStock);
+        } catch (error) {
+            console.error('Error fetching products:', error);
+            setError('Gagal memuat data obat');
+            setProducts([]);
+            setAllProducts([]);
+            setTotalPages(1);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchQuery(e.target.value);
+        setCurrentPage(1); // Reset to first page when searching
+        const newQuery = e.target.value;
+        setSearchQuery(newQuery);
+        
+        // Jika input pencarian dikosongkan, reset requestSent agar fetchProducts dipanggil kembali
+        if (newQuery.trim() === '') {
+            requestSent.current = false;
+        }
+    };
+
+    // Save cart to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('cart', JSON.stringify(cartItems));
+    }, [cartItems]);
+
+    // Save customer info to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('selectedCustomerId', JSON.stringify(selectedCustomerId));
+        localStorage.setItem('customerName', customerName);
+        localStorage.setItem('customerPhone', customerPhone);
+        localStorage.setItem('paymentMethod', paymentMethod);
+    }, [selectedCustomerId, customerName, customerPhone, paymentMethod]);
+
+    // Save view mode to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('posViewMode', viewMode);
+    }, [viewMode]);
+
+    const toggleViewMode = () => {
+        setViewMode(prev => prev === 'grid' ? 'table' : 'grid');
     };
 
     const handleAddToCart = (item: CartItem) => {
@@ -99,106 +205,556 @@ export default function POS() {
         setCartItems(cartItems.filter(item => item.id !== itemId));
     };
 
-    const handleCheckout = () => {
-        console.log('Checkout items:', cartItems);
+    const calculateTotal = () => {
+        return cartItems.reduce((total, item) => {
+            return total + (item.price * (item.quantity || 1));
+        }, 0);
     };
 
-    useEffect(() => {
-        const fetchInventory = async () => {
-            setIsLoading(true);
-            try {
-                // Simulasi delay network
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // Fetch data inventory
-                const response = await fetch('/api/inventory');
-                const data = await response.json();
-                setInventory(data);
-            } catch (error) {
-                console.error('Error fetching inventory:', error);
-            } finally {
-                setIsLoading(false);
-            }
+    const handlePendingSale = () => {
+        // Save current transaction as pending
+        const pendingSale = {
+            id: Date.now(),
+            cartItems,
+            customerName,
+            customerPhone,
+            selectedCustomerId,
+            paymentMethod,
+            timestamp: new Date().toISOString(),
+            total: calculateTotal()
         };
 
-        fetchInventory();
-    }, []);
+        const newPendingSales = [...pendingSales, pendingSale];
+        setPendingSales(newPendingSales);
+        localStorage.setItem('pendingSales', JSON.stringify(newPendingSales));
+
+        // Clear current transaction
+        setCartItems([]);
+        setCustomerName('');
+        setCustomerPhone('');
+        setSelectedCustomerId(null);
+        setPaymentMethod('');
+        setPaymentData(null);
+        localStorage.removeItem('cart');
+        localStorage.removeItem('customerName');
+        localStorage.removeItem('customerPhone');
+        localStorage.removeItem('selectedCustomerId');
+        localStorage.removeItem('paymentMethod');
+
+        setSuccessMessage('Transaksi berhasil ditunda');
+    };
+
+    const handleResumeSale = (saleId: number) => {
+        const sale = pendingSales.find((s: { id: number }) => s.id === saleId);
+        if (!sale) return;
+
+        // Restore pending sale data
+        setCartItems(sale.cartItems);
+        setCustomerName(sale.customerName);
+        setCustomerPhone(sale.customerPhone);
+        setSelectedCustomerId(sale.selectedCustomerId);
+        setPaymentMethod(sale.paymentMethod);
+
+        // Save restored data to localStorage
+        localStorage.setItem('cart', JSON.stringify(sale.cartItems));
+        localStorage.setItem('customerName', sale.customerName);
+        localStorage.setItem('customerPhone', sale.customerPhone);
+        localStorage.setItem('selectedCustomerId', JSON.stringify(sale.selectedCustomerId));
+        localStorage.setItem('paymentMethod', sale.paymentMethod);
+
+        // Remove from pending sales
+        const newPendingSales = pendingSales.filter((s: { id: number }) => s.id !== saleId);
+        setPendingSales(newPendingSales);
+        localStorage.setItem('pendingSales', JSON.stringify(newPendingSales));
+    };
+
+    const handleDeletePendingSale = (saleId: number) => {
+        // Remove from pending sales
+        const newPendingSales = pendingSales.filter((s: { id: number }) => s.id !== saleId);
+        setPendingSales(newPendingSales);
+        localStorage.setItem('pendingSales', JSON.stringify(newPendingSales));
+        
+        // Show success message
+        setSuccessMessage('Transaksi berhasil dihapus');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+            setSuccessMessage(null);
+        }, 3000);
+    };
+
+    const handleCheckout = async () => {
+        if (cartItems.length === 0) {
+            setError('Keranjang kosong. Tambahkan item terlebih dahulu.');
+            return;
+        }
+
+        if (!paymentMethod) {
+            setError('Pilih metode pembayaran terlebih dahulu.');
+            return;
+        }
+        
+        if (!paymentData || !paymentData.isValid) {
+            setError('Data pembayaran tidak lengkap. Silakan lengkapi informasi pembayaran.');
+            return;
+        }
+
+        setProcessingCheckout(true);
+        setError(null);
+        
+        try {
+            // 1. Create the sale
+            const saleData = {
+                customer_id: selectedCustomerId || undefined,
+                customer_name: customerName,
+                customer_phone: customerPhone,
+                items: cartItems.map(item => ({
+                    product_id: parseInt(item.id),
+                    quantity: item.quantity || 1
+                })),
+                payment_method: paymentMethod,
+                payment_details: {
+                    method: paymentMethod,
+                    // Pastikan field penting selalu dikirim dengan tipe data yang benar
+                    cardLast4: paymentMethod === 'debit' || paymentMethod === 'credit' ? (paymentData?.cardLast4 || '') : null,
+                    cardType: paymentMethod === 'debit' || paymentMethod === 'credit' ? (paymentData?.cardType || '') : null,
+                    approvalCode: paymentMethod === 'debit' || paymentMethod === 'credit' ? (paymentData?.approvalCode || '') : null,
+                    transactionId: paymentMethod === 'qris' ? (paymentData?.transactionId || '') : null,
+                    amountPaid: Number(paymentData?.amountPaid || 0),
+                    change: Number(paymentData?.change || 0),
+                    // Pastikan isValid selalu boolean
+                    isValid: Boolean(paymentData?.isValid)
+                },
+                notes: '',
+                total_amount: cartItems.reduce((total, item) => total + (item.price * (item.quantity || 1)), 0)
+            };
+
+            const saleResult = await posService.createSale(saleData);
+
+            // Clear cart and show success message
+            // Clear cart and localStorage after successful checkout
+            setCartItems([]);
+            setSelectedCustomerId(null);
+            setCustomerName('');
+            setCustomerPhone('');
+            setPaymentMethod('');
+            setPaymentData(null);
+            localStorage.removeItem('cart');
+            localStorage.removeItem('selectedCustomerId');
+            localStorage.removeItem('customerName');
+            localStorage.removeItem('customerPhone');
+            localStorage.removeItem('paymentMethod');
+            
+            setSuccessMessage(`Transaksi berhasil! No. Invoice: ${saleResult.sale.invoice_number}`);
+            // Clear success message after 3 seconds
+            setTimeout(() => {
+                setSuccessMessage(null);
+            }, 5000);
+            
+            // 4. Refresh products data
+            fetchProducts();
+
+        } catch (error) {
+            console.error('Error during checkout:', error);
+            setError('Gagal memproses transaksi. Silakan coba lagi.');
+        } finally {
+            setProcessingCheckout(false);
+        }
+    };
+
+    const [activeTab, setActiveTab] = useState('pos');
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
-            <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left Section - Sales and Inventory */}
-                <div className="flex-1 w-full">
-                    {/* Sales Section tetap sama */}
-                    {/* ... */}
-
-                    {/* Inventory Section - diupdate untuk menggunakan data medicines */}
-                    <div>
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                            <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                                Kasir / POS
-                            </h2>
-                            <div className="relative w-full sm:w-80">
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={handleSearch}
-                                    placeholder="Search inventory..."
-                                    className="w-full px-4 py-3 bg-white shadow-lg shadow-gray-200/50 border border-gray-100 rounded-2xl pl-10"
-                                />
-                                <svg
-                                    className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                                    />
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+            {/* Header with Tabs */}
+            <div className="sticky top-0 z-10 bg-gray-50">
+                <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex space-x-1 pt-2 px-2 border-b-2 border-gray-300">
+                        <button
+                            onClick={() => setActiveTab('pos')}
+                            className={`px-6 py-2.5 text-sm font-medium rounded-t-lg transition-all duration-200 relative ${
+                                activeTab === 'pos'
+                                    ? 'bg-white text-gray-900 border-2 border-b-0 border-gray-300 shadow-sm z-10 before:absolute before:bottom-[-2px] before:left-0 before:right-0 before:h-[2px] before:bg-purple-600'
+                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent hover:border-gray-200'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
+                                Penjualan
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={`px-6 py-2.5 text-sm font-medium rounded-t-lg transition-all duration-200 relative ${
+                                activeTab === 'history'
+                                    ? 'bg-white text-gray-900 border-2 border-b-0 border-gray-300 shadow-sm z-10 before:absolute before:bottom-[-2px] before:left-0 before:right-0 before:h-[2px] before:bg-purple-600'
+                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent hover:border-gray-200'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                Riwayat
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-6 bg-white border-l border-r border-b border-gray-200 shadow-sm">
+                {activeTab === 'pos' && (
+                    <div className="flex gap-8 items-start xl:gap-12 max-w-full">
+                        {/* Left Section - Search and Products */}
+                        <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-6 xl:p-8">
+                            <div className="space-y-8">
+                                {/* Header and Search */}
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Point of Sale</h2>
+                                        <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                                            <button
+                                                onClick={() => setViewMode('grid')}
+                                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                                                    viewMode === 'grid'
+                                                    ? 'bg-white text-gray-900 shadow-sm'
+                                                    : 'text-gray-600 hover:text-gray-900'
+                                                }`}
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => setViewMode('table')}
+                                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                                                    viewMode === 'table'
+                                                    ? 'bg-white text-gray-900 shadow-sm'
+                                                    : 'text-gray-600 hover:text-gray-900'
+                                                }`}
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="relative w-full sm:w-96">
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={handleSearch}
+                                            placeholder="Cari obat..."
+                                            className="w-full px-4 py-2.5 pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors duration-200"
+                                        />
+                                        <svg
+                                            className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth="2"
+                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                            />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                {viewMode === 'grid' ? (
+                                    <>
+                                        {/* Low Stock Alert */}
+                                        {lowStockProducts.length > 0 && (
+                                            <div className="space-y-4">
+                                                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                                    <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                                    Stok Menipis
+                                                </h3>
+                                                <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6 gap-4 xl:gap-6">
+                                                    {lowStockProducts.map((product) => (
+                                                        <InventoryCard
+                                                            key={product.id}
+                                                            name={product.name}
+                                                            category={product.category?.name || 'Uncategorized'}
+                                                            price={formatPrice(product.price)}
+                                                            stock={product.stock}
+                                                            requires_prescription={product.requires_prescription}
+                                                            onAddToCart={() => handleAddToCart({
+                                                                id: product.id.toString(),
+                                                                name: product.name,
+                                                                price: product.price,
+                                                                stock: product.stock,
+                                                                requires_prescription: product.requires_prescription,
+                                                                quantity: 1
+                                                            })}
+                                                            isLoading={false}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* All Products - Card View */}
+                                        <div className="space-y-4">
+                                            <h3 className="text-lg font-semibold text-gray-900">Semua Obat</h3>
+                                            <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 gap-4 xl:gap-6">
+                                                {isLoading ? (
+                                                    [...Array(6)].map((_, index) => (
+                                                        <InventoryCard
+                                                            key={index}
+                                                            name=""
+                                                            category=""
+                                                            price=""
+                                                            stock={0}
+                                                            onAddToCart={() => {}}
+                                                            isLoading={true}
+                                                        />
+                                                    ))
+                                                ) : (
+                                                    products.map(product => (
+                                                        <InventoryCard
+                                                            key={product.id}
+                                                            name={product.name}
+                                                            category={product.category?.name || 'Uncategorized'}
+                                                            price={formatPrice(product.price)}
+                                                            stock={product.stock}
+                                                            requires_prescription={product.requires_prescription}
+                                                            onAddToCart={() => handleAddToCart({
+                                                                id: product.id.toString(),
+                                                                name: product.name,
+                                                                price: product.price,
+                                                                stock: product.stock,
+                                                                requires_prescription: product.requires_prescription,
+                                                                quantity: 1
+                                                            })}
+                                                            isLoading={false}
+                                                        />
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Pagination for Grid View */}
+                                        {totalPages > 1 && (
+                                            <div className="mt-6 flex justify-center">
+                                                <Pagination>
+                                                    <PaginationContent>
+                                                        <PaginationItem>
+                                                            <PaginationPrevious 
+                                                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                                                                disabled={currentPage === 1}
+                                                            />
+                                                        </PaginationItem>
+                                                        
+                                                        {/* First page */}
+                                                        {currentPage > 2 && (
+                                                            <PaginationItem>
+                                                                <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
+                                                            </PaginationItem>
+                                                        )}
+                                                        
+                                                        {/* Ellipsis if needed */}
+                                                        {currentPage > 3 && (
+                                                            <PaginationItem>
+                                                                <PaginationEllipsis />
+                                                            </PaginationItem>
+                                                        )}
+                                                        
+                                                        {/* Previous page if not first */}
+                                                        {currentPage > 1 && (
+                                                            <PaginationItem>
+                                                                <PaginationLink onClick={() => setCurrentPage(currentPage - 1)}>
+                                                                    {currentPage - 1}
+                                                                </PaginationLink>
+                                                            </PaginationItem>
+                                                        )}
+                                                        
+                                                        {/* Current page */}
+                                                        <PaginationItem>
+                                                            <PaginationLink isActive>{currentPage}</PaginationLink>
+                                                        </PaginationItem>
+                                                        
+                                                        {/* Next page if not last */}
+                                                        {currentPage < totalPages && (
+                                                            <PaginationItem>
+                                                                <PaginationLink onClick={() => setCurrentPage(currentPage + 1)}>
+                                                                    {currentPage + 1}
+                                                                </PaginationLink>
+                                                            </PaginationItem>
+                                                        )}
+                                                        
+                                                        {/* Ellipsis if needed */}
+                                                        {currentPage < totalPages - 2 && (
+                                                            <PaginationItem>
+                                                                <PaginationEllipsis />
+                                                            </PaginationItem>
+                                                        )}
+                                                        
+                                                        {/* Last page */}
+                                                        {currentPage < totalPages - 1 && (
+                                                            <PaginationItem>
+                                                                <PaginationLink onClick={() => setCurrentPage(totalPages)}>
+                                                                    {totalPages}
+                                                                </PaginationLink>
+                                                            </PaginationItem>
+                                                        )}
+                                                        
+                                                        <PaginationItem>
+                                                            <PaginationNext 
+                                                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                                                                disabled={currentPage === totalPages}
+                                                            />
+                                                        </PaginationItem>
+                                                    </PaginationContent>
+                                                </Pagination>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* All Products - Table View */}
+                                        <div className="space-y-4">
+                                            {lowStockProducts.length > 0 && (
+                                                <div className="mb-8">
+                                                    <h3 className="text-lg font-semibold text-gray-900 flex items-center mb-4">
+                                                        <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                                        Stok Menipis
+                                                    </h3>
+                                                    <InventoryTable
+                                                        products={lowStockProducts}
+                                                        onAddToCart={handleAddToCart}
+                                                        isLoading={isLoading}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Semua Produk</h3>
+                                                <InventoryTable
+                                                    products={products}
+                                                    onAddToCart={handleAddToCart}
+                                                    isLoading={isLoading}
+                                                />
+                                                
+                                                {/* Pagination for Table View */}
+                                                {totalPages > 1 && (
+                                                    <div className="mt-6 flex justify-center">
+                                                        <Pagination>
+                                                            <PaginationContent>
+                                                                <PaginationItem>
+                                                                    <PaginationPrevious 
+                                                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                                                                        disabled={currentPage === 1}
+                                                                    />
+                                                                </PaginationItem>
+                                                                
+                                                                {/* First page */}
+                                                                {currentPage > 2 && (
+                                                                    <PaginationItem>
+                                                                        <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
+                                                                    </PaginationItem>
+                                                                )}
+                                                                
+                                                                {/* Ellipsis if needed */}
+                                                                {currentPage > 3 && (
+                                                                    <PaginationItem>
+                                                                        <PaginationEllipsis />
+                                                                    </PaginationItem>
+                                                                )}
+                                                                
+                                                                {/* Previous page if not first */}
+                                                                {currentPage > 1 && (
+                                                                    <PaginationItem>
+                                                                        <PaginationLink onClick={() => setCurrentPage(currentPage - 1)}>
+                                                                            {currentPage - 1}
+                                                                        </PaginationLink>
+                                                                    </PaginationItem>
+                                                                )}
+                                                                
+                                                                {/* Current page */}
+                                                                <PaginationItem>
+                                                                    <PaginationLink isActive>{currentPage}</PaginationLink>
+                                                                </PaginationItem>
+                                                                
+                                                                {/* Next page if not last */}
+                                                                {currentPage < totalPages && (
+                                                                    <PaginationItem>
+                                                                        <PaginationLink onClick={() => setCurrentPage(currentPage + 1)}>
+                                                                            {currentPage + 1}
+                                                                        </PaginationLink>
+                                                                    </PaginationItem>
+                                                                )}
+                                                                
+                                                                {/* Ellipsis if needed */}
+                                                                {currentPage < totalPages - 2 && (
+                                                                    <PaginationItem>
+                                                                        <PaginationEllipsis />
+                                                                    </PaginationItem>
+                                                                )}
+                                                                
+                                                                {/* Last page */}
+                                                                {currentPage < totalPages - 1 && (
+                                                                    <PaginationItem>
+                                                                        <PaginationLink onClick={() => setCurrentPage(totalPages)}>
+                                                                            {totalPages}
+                                                                        </PaginationLink>
+                                                                    </PaginationItem>
+                                                                )}
+                                                                
+                                                                <PaginationItem>
+                                                                    <PaginationNext 
+                                                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                                                                        disabled={currentPage === totalPages}
+                                                                    />
+                                                                </PaginationItem>
+                                                            </PaginationContent>
+                                                        </Pagination>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>                                        
+                                    </>
+                                )}
                             </div>
                         </div>
 
-                        {/* Inventory Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {isLoading ? (
-                                // Render multiple skeleton cards
-                                [...Array(6)].map((_, index) => (
-                                    <InventoryCard key={index} isLoading={true} />
-                                ))
-                            ) : (
-                                medicines.map(medicine => (
-                                    <InventoryCard
-                                        key={medicine.id}
-                                        name={medicine.name}
-                                        image="https://picsum.photos/400/300"
-                                        category={medicine.category.name}
-                                        price={medicine.price}
-                                        stock={medicine.stock}
-                                        onAddToCart={() => handleAddToCart({
-                                            id: medicine.id.toString(),
-                                            name: medicine.name,
-                                            price: medicine.price,
-                                            stock: medicine.stock
-                                        })}
-                                        isLoading={false}
-                                    />
-                                ))
-                            )}
+                        {/* Right Section - Cart */}
+                        <div className="w-[400px] xl:w-[450px] 2xl:w-[500px] 3xl:w-[550px] sticky top-[84px]">
+                            <Cart
+                                items={cartItems}
+                                onUpdateQuantity={handleUpdateQuantity}
+                                onRemoveItem={handleRemoveItem}
+                                onCheckout={handleCheckout}
+                                onPendingSale={handlePendingSale}
+                                isProcessing={processingCheckout}
+                                paymentMethod={paymentMethod}
+                                onPaymentMethodChange={setPaymentMethod}
+                                onPaymentDataChange={setPaymentData}
+                                error={error}
+                                successMessage={successMessage}
+                                customerName={customerName}
+                                setCustomerName={setCustomerName}
+                                customerPhone={customerPhone}
+                                setCustomerPhone={setCustomerPhone}
+                                customerId={selectedCustomerId}
+                                setCustomerId={setSelectedCustomerId}
+                                pendingSales={pendingSales}
+                                onResumeSale={handleResumeSale}
+                                onDeletePendingSale={handleDeletePendingSale}
+                            />
                         </div>
                     </div>
-                </div>
-
-                {/* Right Section - Cart tetap sama */}
-                <Cart
-                    items={cartItems}
-                    onUpdateQuantity={handleUpdateQuantity}
-                    onRemoveItem={handleRemoveItem}
-                    onCheckout={handleCheckout}
-                />
+                    )}
+                {activeTab === 'history' && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <SalesList />
+                    </div>
+                )}
             </div>
         </div>
     );

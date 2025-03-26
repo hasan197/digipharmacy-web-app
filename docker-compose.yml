@@ -13,7 +13,12 @@ services:
     working_dir: /var/www
     environment:
     #   - APP_ENV=local
+      # - APP_ENV=production
       - VITE_APP_PORT=5173
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_TTL=60
+      - JWT_REFRESH_TTL=20160
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173
     depends_on:
       - db
     command: >
