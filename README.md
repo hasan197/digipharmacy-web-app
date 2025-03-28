@@ -1,20 +1,19 @@
 # DigiPharmacy
-<img src="public/images/screenshot.png" alt="POS page" width="1024">
 
 ## Architecture Overview
 
-DigiPharmacy menggunakan kombinasi Domain-Driven Design (DDD) dan Progressive Architecture untuk memastikan sistem yang maintainable dan scalable.
+DigiPharmacy uses a combination of Domain-Driven Design (DDD) and Progressive Architecture to ensure a maintainable and scalable system.
 
 ### Core Principles
 
 1. **Domain-Driven Design (DDD)**
-   - Fokus pada domain bisnis
+   - Focus on business domain
    - Ubiquitous language
    - Bounded contexts
    - Rich domain models
 
 2. **Progressive Architecture**
-   - Evolusi bertahap
+   - Gradual evolution
    - Interface-first approach
    - Event-driven system
    - Forward compatibility
@@ -52,7 +51,7 @@ app/
 ### Layer Responsibilities
 
 1. **Domain Layer** (`app/Domain/`)
-   - Core business logic dan rules
+   - Core business logic and rules
    - Pure PHP, no framework dependencies
    - Entities, value objects, events
    - Repository interfaces
@@ -116,43 +115,43 @@ cd digipharmacy
 
 2. **Environment Setup**
 ```bash
-Copy .env file
+# Copy .env file
 cp .env.example .env
-Set environment variables
-export APP_ENV=local # untuk development
-atau
-export APP_ENV=production # untuk production
+# Set environment variables
+export APP_ENV=local # for development
+or
+export APP_ENV=production # for production
 ```
 
 3. **Container Build & Run**
 ```bash
-# Pertama kali atau saat ada perubahan Dockerfile/dependencies
+# First time or when Dockerfile/dependencies change
 nerdctl compose up --build
 
-# Untuk menjalankan container yang sudah ada
+# To run existing containers
 nerdctl compose up -d
 ```
 
 
 4. **Useful Commands**
 ```bash
-# Melihat logs
+# View logs
 nerdctl compose logs -f digipharmacy-app-1
 
-# Masuk ke container
+# Enter container
 nerdctl compose exec digipharmacy-app-1 sh
 
-# Melihat status container
+# Check container status
 nerdctl compose ps
 ```
 
-## Flow Development API
+## API Development Flow
 
-Untuk menambahkan API baru, ikuti langkah-langkah berikut sesuai Progressive Architecture:
+To add a new API, follow these steps according to Progressive Architecture:
 
-### 1. Definisi Interface (Contracts)
+### 1. Interface Definition (Contracts)
 
-Buat interface di `app/Application/Contracts/<Module>/` untuk mendefinisikan kontrak service:
+Create an interface in `app/Application/Contracts/<Module>/` to define the service contract:
 
 ```php
 namespace App\Application\Contracts\<Module>;
@@ -168,7 +167,7 @@ interface ServiceInterface
 
 ### 2. Domain Events
 
-1. **Base Event** di `app/Infrastructure/Events/DomainEvent.php`:
+1. **Base Event** in `app/Infrastructure/Events/DomainEvent.php`:
 ```php
 abstract class DomainEvent
 {
@@ -184,7 +183,7 @@ abstract class DomainEvent
 }
 ```
 
-2. **Specific Events** di `app/Infrastructure/Events/<Module>/`:
+2. **Specific Events** in `app/Infrastructure/Events/<Module>/`:
 ```php
 class EntityCreated extends DomainEvent
 {
@@ -203,7 +202,7 @@ class EntityCreated extends DomainEvent
 
 ### 3. Domain Layer
 
-1. **Value Objects** di `app/Domain/<Module>/ValueObjects/`:
+1. **Value Objects** in `app/Domain/<Module>/ValueObjects/`:
 ```php
 class EntityId
 {
@@ -222,7 +221,7 @@ class EntityId
 }
 ```
 
-2. **Repository Interface** di `app/Domain/<Module>/Repositories/`:
+2. **Repository Interface** in `app/Domain/<Module>/Repositories/`:
 ```php
 interface EntityRepositoryInterface
 {
@@ -232,7 +231,7 @@ interface EntityRepositoryInterface
 }
 ```
 
-3. **Domain Service** di `app/Domain/<Module>/Services/`:
+3. **Domain Service** in `app/Domain/<Module>/Services/`:
 ```php
 class EntityService implements EntityServiceInterface
 {
@@ -252,7 +251,7 @@ class EntityService implements EntityServiceInterface
 
 ### 4. Infrastructure Layer
 
-1. **Repository Implementation** di `app/Infrastructure/<Module>/Repositories/`:
+1. **Repository Implementation** in `app/Infrastructure/<Module>/Repositories/`:
 ```php
 class EntityRepository implements EntityRepositoryInterface
 {
@@ -264,7 +263,7 @@ class EntityRepository implements EntityRepositoryInterface
 }
 ```
 
-2. **Event Listeners** di `app/Infrastructure/<Module>/Listeners/`:
+2. **Event Listeners** in `app/Infrastructure/<Module>/Listeners/`:
 ```php
 class EntityCreatedListener
 {
@@ -278,7 +277,7 @@ class EntityCreatedListener
 
 ### 5. Interface Layer
 
-1. **Controller** di `app/Http/Controllers/<Module>/`:
+1. **Controller** in `app/Http/Controllers/<Module>/`:
 ```php
 class EntityController
 {
@@ -300,7 +299,7 @@ class EntityController
 }
 ```
 
-2. **Routes** di `routes/api.php`:
+2. **Routes** in `routes/api.php`:
 ```php
 Route::prefix('v1')->group(function () {
     Route::apiResource('entities', EntityController::class);
@@ -309,7 +308,7 @@ Route::prefix('v1')->group(function () {
 
 ### 6. Service Provider
 
-Register di `app/Providers/<Module>ServiceProvider.php`:
+Register in `app/Providers/<Module>ServiceProvider.php`:
 ```php
 class ModuleServiceProvider extends ServiceProvider
 {
@@ -331,52 +330,52 @@ class ModuleServiceProvider extends ServiceProvider
 ## Development Checklist
 
 ### 1. Preparation
-- [ ] Identifikasi domain/module baru
-- [ ] Review existing code yang terkait
-- [ ] Definisikan interface dan kontrak
+- [ ] Identify new domain/module
+- [ ] Review related existing code
+- [ ] Define interfaces and contracts
 
 ### 2. Core Implementation
-- [ ] Buat interface service di `/Application/Contracts`
-- [ ] Buat base event (jika belum ada)
-- [ ] Buat specific events
-- [ ] Implementasi value objects
-- [ ] Implementasi repository interface
-- [ ] Implementasi domain service
+- [ ] Create service interface in `/Application/Contracts`
+- [ ] Create base event (if not exists)
+- [ ] Create specific events
+- [ ] Implement value objects
+- [ ] Implement repository interface
+- [ ] Implement domain service
 
 ### 3. Infrastructure
-- [ ] Implementasi repository
-- [ ] Buat event listeners
-- [ ] Setup database migrations (jika perlu)
+- [ ] Implement repository
+- [ ] Create event listeners
+- [ ] Setup database migrations (if needed)
 
 ### 4. Interface
-- [ ] Buat controller
-- [ ] Definisikan routes
-- [ ] Implementasi request validation
+- [ ] Create controller
+- [ ] Define routes
+- [ ] Implement request validation
 
 ### 5. Dependency Injection
-- [ ] Register interface bindings di service provider
+- [ ] Register interface bindings in service provider
 - [ ] Register event listeners
 
 ### 6. Testing
-- [ ] Unit tests untuk domain logic
-- [ ] Integration tests untuk API
+- [ ] Unit tests for domain logic
+- [ ] Integration tests for API
 - [ ] Event handling tests
 
 ### 7. Documentation
 - [ ] Update API documentation
-- [ ] Update README jika perlu
+- [ ] Update README if needed
 - [ ] Document any new patterns used
 
 ### 2. Infrastructure Layer (Technical Implementation)
 
-Infrastructure layer berisi implementasi teknis dari kontrak yang didefinisikan di domain layer.
+Infrastructure layer contains technical implementations of contracts defined in the domain layer.
 
-1. **Buat Model Mapper** - *Transformer antara domain dan persistence model*
-   Mapper bertugas:
-   - Mengkonversi Eloquent model ke Domain model
-   - Mengkonversi Domain model ke Eloquent model
-   - Handling relasi antar model
-   - Transformasi tipe data jika diperlukan di `app/Infrastructure/<Module>/Mappers/`
+1. **Create Model Mapper** - *Transformer between domain and persistence model*
+   Mapper responsibilities:
+   - Convert Eloquent model to Domain model
+   - Convert Domain model to Eloquent model
+   - Handle model relationships
+   - Transform data types if needed in `app/Infrastructure/<Module>/Mappers/`
    ```php
    namespace App\Infrastructure\<Module>\Mappers;
    
@@ -392,12 +391,12 @@ Infrastructure layer berisi implementasi teknis dari kontrak yang didefinisikan 
    }
    ```
 
-2. **Buat Repository Implementation** - *Implementasi akses data konkrit*
-   Repository berisi:
-   - Implementasi method-method dari interface
-   - Query builder untuk database
-   - Caching strategy jika diperlukan
-   - Error handling spesifik database di `app/Infrastructure/<Module>/Repositories/`
+2. **Create Repository Implementation** - *Concrete data access implementation*
+   Repository contains:
+   - Implementation of interface methods
+   - Query builder for database
+   - Caching strategy if needed
+   - Database-specific error handling in `app/Infrastructure/<Module>/Repositories/`
    ```php
    namespace App\Infrastructure\<Module>\Repositories;
    
@@ -413,14 +412,14 @@ Infrastructure layer berisi implementasi teknis dari kontrak yang didefinisikan 
 
 ### 3. Container & Service Provider (Dependency Management)
 
-Container dan Service Provider menangani dependency injection dan lifecycle object.
+Container and Service Provider handle dependency injection and object lifecycle.
 
-1. **Buat Container** - *Factory untuk service dan dependencies*
-   Container bertugas:
-   - Instantiasi service dan dependencies
-   - Menyediakan singleton instances jika diperlukan
-   - Mengatur lifecycle object
-   - Menyederhanakan dependency graph di `app/Infrastructure/Container/`
+1. **Create Container** - *Factory for services and dependencies*
+   Container responsibilities:
+   - Instantiate services and dependencies
+   - Provide singleton instances if needed
+   - Manage object lifecycle
+   - Simplify dependency graph in `app/Infrastructure/Container/`
    ```php
    namespace App\Infrastructure\Container;
    
@@ -442,12 +441,12 @@ Container dan Service Provider menangani dependency injection dan lifecycle obje
    }
    ```
 
-2. **Buat/Update Service Provider** - *Registrasi service ke Laravel*
-   Provider bertugas:
-   - Binding interface ke implementasi
-   - Registrasi singleton services
-   - Konfigurasi awal service
-   - Boot-time initialization di `app/Providers/`
+2. **Create/Update Service Provider** - *Register services to Laravel*
+   Provider responsibilities:
+   - Bind interfaces to implementations
+   - Register singleton services
+   - Initial service configuration
+   - Boot-time initialization in `app/Providers/`
    ```php
    namespace App\Providers;
    
@@ -466,11 +465,11 @@ Container dan Service Provider menangani dependency injection dan lifecycle obje
    }
    ```
 
-3. **Daftarkan Service Provider** - *Aktivasi service di aplikasi*
-   Pendaftaran di config:
-   - Menambahkan provider ke application providers
-   - Mengatur urutan loading
-   - Menentukan environment (local/production) di `config/app.php`
+3. **Register Service Provider** - *Activate service in application*
+   Registration in config:
+   - Add provider to application providers
+   - Configure loading order
+   - Determine environment (local/production) in `config/app.php`
    ```php
    'providers' => ServiceProvider::defaultProviders()->merge([
        // ...
@@ -480,15 +479,15 @@ Container dan Service Provider menangani dependency injection dan lifecycle obje
 
 ### 4. Controller & Route (Interface Layer)
 
-Interface layer menangani HTTP request/response dan routing.
+Interface layer handles HTTP request/response and routing.
 
-1. **Buat Controller** - *Handler untuk HTTP request*
-   Controller bertugas:
-   - Menerima HTTP request
-   - Validasi input
-   - Memanggil domain service
-   - Memformat response
-   - Error handling HTTP level di `app/Http/Controllers/`
+1. **Create Controller** - *Handler for HTTP requests*
+   Controller responsibilities:
+   - Receive HTTP requests
+   - Validate input
+   - Call domain service
+   - Format response
+   - HTTP-level error handling in `app/Http/Controllers/`
    ```php
    namespace App\Http\Controllers;
    
@@ -506,28 +505,28 @@ Interface layer menangani HTTP request/response dan routing.
    }
    ```
 
-2. **Tambahkan Route** - *Definisi endpoint API*
+2. **Add Route** - *Define API endpoint*
    Route configuration:
    - HTTP method (GET, POST, PUT, DELETE)
    - URL pattern
    - Middleware (auth, throttle, cors)
    - Route grouping
-   - Route naming di `routes/api.php`
+   - Route naming in `routes/api.php`
    ```php
    Route::middleware('auth:sanctum')->group(function () {
        Route::get('/your-endpoint', [YourController::class, 'index']);
    });
    ```
 
-Dengan mengikuti flow ini, kita memastikan:
-1. Separation of concerns yang baik
-2. Dependency injection yang terstruktur
-3. Testability yang baik
-4. Kode yang maintainable dan scalable
+By following this flow, we ensure:
+1. Good separation of concerns
+2. Structured dependency injection
+3. Good testability
+4. Maintainable and scalable code
 
 ## Architecture Evolution
 
-DigiPharmacy menggunakan Progressive Architecture untuk mendukung evolusi sistem secara bertahap:
+DigiPharmacy uses Progressive Architecture to support gradual system evolution:
 
 ### 1. Project Structure
 ```
@@ -628,7 +627,7 @@ class OrderCreated extends DomainEvent {
    - Consistent standards
    - Easy onboarding
 
-# Menghentikan container
+# Stop container
 nerdctl compose down
 
 # Rebuild specific service
@@ -655,51 +654,51 @@ nerdctl compose up -d --build digipharmacy-app-1
 ### Development Mode
 ```bash
 export APP_ENV=local
-# Pertama kali atau saat ada perubahan Dockerfile
+# First time or when Dockerfile changes
 nerdctl compose up --build
 
-# Untuk development sehari-hari
+# For daily development
 nerdctl compose up -d
 
-# Setelah container berjalan, jalankan npm run dev
+# After container is running, run npm run dev
 nerdctl exec -it digipharmacy-app-1 sh
 lsof -i :5173
 kill -9 <PID>
 npm run dev
 ```
 
-Development mode akan:
-- Menjalankan Laravel server di port 8000
-- Menjalankan Vite dev server di port 5173
-- Mengaktifkan hot reload untuk React components
-- Memungkinkan debugging
+Development mode will:
+- Run Laravel server on port 8000
+- Run Vite dev server on port 5173
+- Enable hot reload for React components
+- Allow debugging
 
-Pastikan untuk menjalankan `npm run dev` setelah container up karena:
-1. Container perlu fully running terlebih dahulu
-2. Vite dev server perlu berjalan untuk hot reload
-3. Development dependencies perlu ter-install dengan benar
+Make sure to run `npm run dev` after container is up because:
+1. Container needs to be fully running first
+2. Vite dev server needs to run for hot reload
+3. Development dependencies need to be properly installed
 
 ### Production Mode
 ```bash
 export APP_ENV=production
-# Build ulang jika ada perubahan di Dockerfile atau dependencies
+# Rebuild if there are changes to Dockerfile or dependencies
 nerdctl compose up --build
 
-# Jika tidak ada perubahan, cukup
+# If no changes, just run
 nerdctl compose up -d
 ```
 
-- Assets di-build dan diminifikasi
-- Cache dioptimalkan
-- Performa dioptimalkan
-- Akses: http://localhost:8000
+- Assets are built and minified
+- Cache is optimized
+- Performance is optimized
+- Access: http://localhost:8000
 
 ## Docker Configuration
 
 ### Multi-stage Build
-Dockerfile menggunakan multi-stage build untuk optimasi:
-1. Build stage: Kompilasi assets React/TypeScript
-2. Production stage: Setup PHP dan aplikasi
+Dockerfile uses multi-stage build for optimization:
+1. Build stage: Compile React/TypeScript assets
+2. Production stage: Setup PHP and application
 
 ### Volume Mounts
 - `.:/var/www`: Source code
@@ -719,6 +718,6 @@ Dockerfile menggunakan multi-stage build untuk optimasi:
 - Docker/nerdctl
 
 ## Notes
-- Development mode menggunakan Vite dev server untuk hot reload
-- Production mode menggunakan pre-built assets
-- Database credentials dapat dikonfigurasi melalui environment variables
+- Development mode uses Vite dev server for hot reload
+- Production mode uses pre-built assets
+- Database credentials can be configured through environment variables
