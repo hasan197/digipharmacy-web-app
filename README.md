@@ -1,4 +1,5 @@
 # DigiPharmacy
+<img src="public/images/screenshot.png" alt="POS page" width="1024">
 
 ## Architecture Overview
 
